@@ -31,6 +31,7 @@ graph TD
     G --> H{Actions}
     H -->|Accept| I[Status: ACCEPTED<br>Notify User<br>Show in Profile]
     H -->|Reject| J[Delete from DB & Storage<br>Notify User]
+```
 
 Core Functionalities
 1. User Upload Module
@@ -47,9 +48,3 @@ View pending queue with thumbnails
 Preview PDF in-browser
 Accept → Save + Notify
 Reject → Delete from DB & cloud
-
-3. Notification System
-
-Real-time status in User Profile
-Toast alerts on upload result
-Accepted uploads listed with download links
