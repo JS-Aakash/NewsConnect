@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Session, User } from "@supabase/supabase-js";
 import { useToast } from "@/hooks/use-toast";
-import { useSafeNavigation } from "@/hooks/useSafeNavigation";
 import UserDashboard from "@/components/dashboard/UserDashboard";
 import AdminDashboard from "@/components/dashboard/AdminDashboard";
 import { Button } from "@/components/ui/button";
@@ -12,33 +11,58 @@ import { LogOut, Upload } from "lucide-react";
 const Dashboard = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { safeNavigate, resetNavigationState } = useSafeNavigation();
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [hasNavigated, setHasNavigated] = useState(false);
 
   useEffect(() => {
+    let isMounted = true;
+
+    const initAuth = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+
+        if (!session && isMounted) {
+          navigate("/auth", { replace: true });
+          return;
+        }
+
+        if (isMounted) {
+          setSession(session);
+          setUser(session?.user ?? null);
+        }
+      } catch (error) {
+        console.error("Error initializing auth:", error);
+        if (isMounted) {
+          navigate("/auth", { replace: true });
+        }
+      }
+    };
+
+    initAuth();
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
+        if (isMounted) {
+          if (event === 'SIGNED_OUT' || !session) {
+            navigate("/auth", { replace: true });
+          } else {
+            setSession(session);
+            setUser(session?.user ?? null);
+          }
+        }
       }
     );
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
+  }, [navigate]);
 
   useEffect(() => {
-    if (!user && !hasNavigated) {
-      setHasNavigated(true);
-      safeNavigate("/auth", { replace: true });
+    if (!user) {
       return;
     }
 
@@ -60,21 +84,17 @@ const Dashboard = () => {
       }
     };
 
-    if (user) {
-      checkAdminStatus();
-    }
-  }, [user, safeNavigate, hasNavigated]);
+    checkAdminStatus();
+  }, [user]);
 
   const handleLogout = async () => {
     try {
       await supabase.auth.signOut();
-      setHasNavigated(false); // Reset navigation state
-      resetNavigationState(); // Reset safe navigation state
       toast({
         title: "Logged out",
         description: "You've been successfully logged out.",
       });
-      safeNavigate("/auth", { replace: true });
+      // Navigation will be handled by onAuthStateChange
     } catch (error: any) {
       toast({
         title: "Logout failed",

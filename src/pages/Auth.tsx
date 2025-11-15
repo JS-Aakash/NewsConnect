@@ -7,8 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { useSafeNavigation } from "@/hooks/useSafeNavigation";
-import { Upload, CheckCircle2 } from "lucide-react";
+import { Upload } from "lucide-react";
 import { z } from "zod";
 
 const signupSchema = z.object({
@@ -25,10 +24,8 @@ const loginSchema = z.object({
 const Auth = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { safeNavigate } = useSafeNavigation();
   const [loading, setLoading] = useState(false);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
-  const [hasNavigated, setHasNavigated] = useState(false);
 
   const [signupData, setSignupData] = useState({
     email: "",
@@ -43,16 +40,16 @@ const Auth = () => {
 
   useEffect(() => {
     let isMounted = true;
+    let hasChecked = false;
 
     const checkAuth = async () => {
-      if (hasNavigated) return;
+      if (hasChecked) return;
+      hasChecked = true;
 
-      setIsCheckingAuth(true);
       try {
         const { data: { session } } = await supabase.auth.getSession();
-        if (session && isMounted && !hasNavigated) {
-          setHasNavigated(true);
-          safeNavigate("/dashboard", { replace: true });
+        if (session && isMounted) {
+          navigate("/dashboard", { replace: true });
         }
       } catch (error) {
         console.error("Auth check error:", error);
@@ -66,9 +63,8 @@ const Auth = () => {
     checkAuth();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_IN' && session && isMounted && !hasNavigated) {
-        setHasNavigated(true);
-        safeNavigate("/dashboard", { replace: true });
+      if (event === 'SIGNED_IN' && session && isMounted) {
+        navigate("/dashboard", { replace: true });
       }
     });
 
@@ -76,7 +72,7 @@ const Auth = () => {
       isMounted = false;
       subscription.unsubscribe();
     };
-  }, [navigate, hasNavigated]);
+  }, [navigate]);
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -126,13 +122,14 @@ const Auth = () => {
       });
 
       if (error) throw error;
+      
+      // Navigation will be handled by onAuthStateChange
     } catch (error: any) {
       toast({
         title: "Login failed",
         description: error.message || "Please check your credentials.",
         variant: "destructive",
       });
-    } finally {
       setLoading(false);
     }
   };
